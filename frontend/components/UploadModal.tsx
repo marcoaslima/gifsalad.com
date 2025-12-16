@@ -35,6 +35,7 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
         formData.append("height", "480"); // Default height
         formData.append("isAdult", String(isAdult));
         formData.append("file", file);
+        formData.append("originalId", file.name);
 
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';

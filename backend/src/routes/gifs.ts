@@ -29,7 +29,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 // POST /gifs - Add a new gif
 router.post('/', upload.single('file'), async (req, res) => {
     try {
-        const { title, width, height, isAdult } = req.body;
+        const { title, width, height, isAdult, originalId } = req.body;
         let { url, tags } = req.body;
 
         // Handle file upload
@@ -53,7 +53,8 @@ router.post('/', upload.single('file'), async (req, res) => {
             height: parseInt(height), // Ensure number
             tags: tags || [],
             featured: false,
-            isAdult: isAdult === 'true' || isAdult === true
+            isAdult: isAdult === 'true' || isAdult === true,
+            originalId: originalId || null
         });
 
         const savedGif = await newGif.save();

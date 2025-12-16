@@ -8,6 +8,7 @@ export interface IGif extends Document {
     featured: boolean;
     tags: string[];
     createdAt: Date;
+    originalId?: string;
 }
 
 const GifSchema: Schema = new Schema({
@@ -18,6 +19,7 @@ const GifSchema: Schema = new Schema({
     tags: { type: [String], default: [] },
     featured: { type: Boolean, default: false },
     isAdult: { type: Boolean, default: false },
+    originalId: { type: String },
     createdAt: { type: Date, default: Date.now },
 });
 

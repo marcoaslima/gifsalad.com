@@ -1,11 +1,8 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Header } from "@/components/Header";
 import { GifGrid } from "@/components/GifGrid";
 import { TagList } from "@/components/TagList";
-
-// ... imports
-import { useEffect } from "react";
 
 interface Gif {
   _id: string; // Mongoose ID
@@ -25,11 +22,14 @@ export default function Home() {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isAdult, setIsAdult] = useState(false);
 
-  const fetchGifs = async () => {
+  const fetchGifs = useCallback(async () => {
+    setLoading(true);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-      const res = await fetch(`${apiUrl}/gifs`);
+      // Append includeAdult based on state
+      const res = await fetch(`${apiUrl}/gifs?includeAdult=${isAdult}`);
       if (res.ok) {
         const data = await res.json();
         setGifs(data);
@@ -39,14 +39,51 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAdult]);
 
-  // Fetch GIFs from Backend
+  // Load user preference on mount
   useEffect(() => {
-    fetchGifs();
+    const savedPreference = localStorage.getItem("canViewAdult");
+    if (savedPreference === "true") {
+      setIsAdult(true);
+    }
   }, []);
 
-  const allTags = useMemo(() => Array.from(new Set(gifs.flatMap(g => g.tags))).sort(), [gifs]);
+  // Fetch GIFs when isAdult changes (or on mount)
+  useEffect(() => {
+    fetchGifs();
+  }, [fetchGifs]);
+
+  const topTags = useMemo(() => {
+    const tagCounts = new Map<string, number>();
+    gifs.forEach(gif => {
+      gif.tags.forEach(tag => {
+        tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+      });
+    });
+    return Array.from(tagCounts.entries())
+      .sort((a, b) => b[1] - a[1]) // Sort by count desc
+      .slice(0, 10) // Take top 10
+      .map(([tag]) => tag);
+  }, [gifs]);
+
+  const handleTagSelect = (tag: string | null) => {
+    if (tag === "+18") {
+      const newIsAdult = !isAdult;
+      setIsAdult(newIsAdult);
+      localStorage.setItem("canViewAdult", String(newIsAdult));
+      localStorage.setItem("isAdultConfigured", "true");
+      return;
+    }
+    setSelectedTag(tag);
+  };
+
+  const displayTags = useMemo(() => {
+    return [
+      ...topTags,
+      "+18"
+    ];
+  }, [topTags]);
 
   const filteredGifs = useMemo(() => {
     if (!selectedTag) return gifs;
@@ -60,12 +97,7 @@ export default function Home() {
       <div className="fixed inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none -z-10"></div>
       <div className="fixed inset-0 bg-gradient-to-tr from-purple-900/10 via-transparent to-blue-900/10 pointer-events-none -z-10"></div>
 
-      <AgeVerificationModal onVerify={(isAdult) => {
-        if (!isAdult) {
-          // Optional: Handle rejection (e.g., redirect or show simplified view)
-          console.log("User is not an adult");
-        }
-      }} />
+      <AgeVerificationModal onVerify={(isVerified) => setIsAdult(isVerified)} />
 
       <Header onUploadClick={() => setIsUploadOpen(true)} />
 
@@ -94,7 +126,11 @@ export default function Home() {
         </div>
 
         <div className="mb-8 sticky top-24 z-40 bg-black/50 backdrop-blur-xl p-2 rounded-2xl border border-white/5 -mx-2 px-4 shadow-xl">
-          <TagList tags={allTags} selectedTag={selectedTag} onSelectTag={setSelectedTag} />
+          <TagList
+            tags={displayTags}
+            selectedTag={selectedTag}
+            onSelectTag={handleTagSelect}
+          />
         </div>
 
         {loading ? (
