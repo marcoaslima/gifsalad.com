@@ -2,7 +2,11 @@ import React from "react";
 import { Search, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export function Header() {
+interface HeaderProps {
+    onUploadClick?: () => void;
+}
+
+export function Header({ onUploadClick }: HeaderProps) {
     return (
         <header className="fixed top-0 left-0 right-0 z-50 px-6 py-4 pointer-events-none">
             <div className={cn("glass pointer-events-auto rounded-2xl mx-auto max-w-7xl px-6 py-3 flex items-center justify-between shadow-lg shadow-purple-900/10")}>
@@ -26,7 +30,7 @@ export function Header() {
 
                 <div className="flex items-center gap-4">
                     <button className="hidden sm:block text-sm font-medium text-gray-300 hover:text-white transition-colors">Trending</button>
-                    <button className="bg-white text-black px-4 py-2 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-colors shadow-lg shadow-white/10">Upload</button>
+                    <button onClick={onUploadClick} className="bg-white text-black px-4 py-2 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-colors shadow-lg shadow-white/10">Upload</button>
                 </div>
             </div>
         </header>

@@ -4,96 +4,79 @@ import { Header } from "@/components/Header";
 import { GifGrid } from "@/components/GifGrid";
 import { TagList } from "@/components/TagList";
 
-// Mock Data with real Giphy WebP URLs and Tags
-const MOCK_GIFS = [
-  {
-    id: "1",
-    title: "Cyberpunk City",
-    url: "https://media.giphy.com/media/LdLqDte8V5VTy/giphy.webp",
-    width: 480,
-    height: 270,
-    featured: true,
-    tags: ["Cyberpunk", "Sci-Fi", "City", "Neon"],
-  },
-  {
-    id: "2",
-    title: "Retro Wave",
-    url: "https://media.giphy.com/media/3o7TKsAdQnps51u5xu/giphy.webp",
-    width: 480,
-    height: 480,
-    tags: ["Retro", "Synthwave", "80s", "Loop"],
-  },
-  {
-    id: "3",
-    title: "Neon Lights",
-    url: "https://media.giphy.com/media/l0HlHFRbmaZtBRhXG/giphy.webp",
-    width: 480,
-    height: 270,
-    tags: ["Abstract", "Neon", "Lights"],
-  },
-  {
-    id: "4",
-    title: "Glitch Art",
-    url: "https://media.giphy.com/media/xT9IgusfDcjjFCUOca/giphy.webp",
-    width: 480,
-    height: 480,
-    tags: ["Glitch", "Art", "Trippy"],
-  },
-  {
-    id: "5",
-    title: "Digital Rain",
-    url: "https://media.giphy.com/media/13HgwGsXF0aiGY/giphy.webp",
-    width: 480,
-    height: 360,
-    tags: ["Matrix", "Code", "Cyberpunk", "Rain"],
-  },
-  {
-    id: "6",
-    title: "Abstract Flow",
-    url: "https://media.giphy.com/media/3o7qDQ4kcSD1PLM3BK/giphy.webp",
-    width: 480,
-    height: 480,
-    tags: ["Abstract", "Liquid", "Flow", "3D"],
-  },
-  {
-    id: "7",
-    title: "Pixel Art",
-    url: "https://media.giphy.com/media/sIIhZ104wx4Ha/giphy.webp",
-    width: 480,
-    height: 270,
-    tags: ["Pixel Art", "Retro", "Game", "Scenery"],
-  },
-  {
-    id: "8",
-    title: "Vaporwave aesthetics",
-    url: "https://media.giphy.com/media/3o6Ztg2MgUkcXyC8fb/giphy.webp",
-    width: 480,
-    height: 270,
-    tags: ["Vaporwave", "Aesthetic", "Pink", "Retro"],
-  },
-];
+// ... imports
+import { useEffect } from "react";
 
-// Extract unique tags
-const ALL_TAGS = Array.from(new Set(MOCK_GIFS.flatMap(gif => gif.tags))).sort();
+interface Gif {
+  _id: string; // Mongoose ID
+  title: string;
+  url: string;
+  width: number;
+  height: number;
+  featured?: boolean;
+  tags: string[];
+}
+
+import { AgeVerificationModal } from "@/components/AgeVerificationModal";
+import { UploadModal } from "@/components/UploadModal";
 
 export default function Home() {
+  const [gifs, setGifs] = useState<Gif[]>([]);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+
+  const fetchGifs = async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const res = await fetch(`${apiUrl}/gifs`);
+      if (res.ok) {
+        const data = await res.json();
+        setGifs(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch gifs", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch GIFs from Backend
+  useEffect(() => {
+    fetchGifs();
+  }, []);
+
+  const allTags = useMemo(() => Array.from(new Set(gifs.flatMap(g => g.tags))).sort(), [gifs]);
 
   const filteredGifs = useMemo(() => {
-    if (!selectedTag) return MOCK_GIFS;
-    return MOCK_GIFS.filter(gif => gif.tags.includes(selectedTag));
-  }, [selectedTag]);
+    if (!selectedTag) return gifs;
+    return gifs.filter(gif => gif.tags.includes(selectedTag));
+  }, [selectedTag, gifs]);
 
   return (
     <main className="min-h-screen bg-black relative selection:bg-purple-500/30">
-      {/* Ambient Background */}
+      { /* ... background elements ... */}
       <div className="fixed inset-0 bg-neutral-950 pointer-events-none -z-20"></div>
       <div className="fixed inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none -z-10"></div>
       <div className="fixed inset-0 bg-gradient-to-tr from-purple-900/10 via-transparent to-blue-900/10 pointer-events-none -z-10"></div>
 
-      <Header />
+      <AgeVerificationModal onVerify={(isAdult) => {
+        if (!isAdult) {
+          // Optional: Handle rejection (e.g., redirect or show simplified view)
+          console.log("User is not an adult");
+        }
+      }} />
+
+      <Header onUploadClick={() => setIsUploadOpen(true)} />
+
+      <UploadModal
+        isOpen={isUploadOpen}
+        onClose={() => setIsUploadOpen(false)}
+        onUploadSuccess={fetchGifs}
+      />
 
       <div className="pt-32 pb-12 max-w-7xl mx-auto px-6 relative z-10">
+        { /* ... Hero Section ... */}
         <div className="flex flex-col mb-12 items-center text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-purple-300 mb-6 backdrop-blur-sm">
             <span className="relative flex h-2 w-2">
@@ -111,10 +94,14 @@ export default function Home() {
         </div>
 
         <div className="mb-8 sticky top-24 z-40 bg-black/50 backdrop-blur-xl p-2 rounded-2xl border border-white/5 -mx-2 px-4 shadow-xl">
-          <TagList tags={ALL_TAGS} selectedTag={selectedTag} onSelectTag={setSelectedTag} />
+          <TagList tags={allTags} selectedTag={selectedTag} onSelectTag={setSelectedTag} />
         </div>
 
-        <GifGrid gifs={filteredGifs} />
+        {loading ? (
+          <div className="text-center py-20 text-gray-500 animate-pulse">Loading Vibes...</div>
+        ) : (
+          <GifGrid gifs={filteredGifs.map(g => ({ ...g, id: g._id }))} />
+        )}
       </div>
     </main>
   );
