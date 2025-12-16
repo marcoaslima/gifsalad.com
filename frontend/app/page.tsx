@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Header } from "@/components/Header";
 import { GifGrid } from "@/components/GifGrid";
 import { TagList } from "@/components/TagList";
@@ -20,26 +20,77 @@ import { UploadModal } from "@/components/UploadModal";
 export default function Home() {
   const [gifs, setGifs] = useState<Gif[]>([]);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const loadingRef = useRef(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isAdult, setIsAdult] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
-  const fetchGifs = useCallback(async () => {
+  const fetchGifs = useCallback(async (pageNum: number, shouldAppend: boolean) => {
+    if (loading) return; // Prevent duplicate requests
     setLoading(true);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-      // Append includeAdult based on state
-      const res = await fetch(`${apiUrl}/gifs?includeAdult=${isAdult}`);
+      const res = await fetch(`${apiUrl}/gifs?includeAdult=${isAdult}&page=${pageNum}&limit=30`);
+
       if (res.ok) {
         const data = await res.json();
-        setGifs(data);
+        if (data.length < 30) {
+          setHasMore(false);
+        } else {
+          setHasMore(true);
+        }
+
+        setGifs(prev => shouldAppend ? [...prev, ...data] : data);
       }
     } catch (error) {
       console.error("Failed to fetch gifs", error);
     } finally {
       setLoading(false);
     }
-  }, [isAdult]);
+  }, [isAdult]); // loading removed from dependency to avoid staleness issues inside, handled by ref check or just logic
+
+  // Handle isAdult change -> Reset
+  useEffect(() => {
+    // We only want to trigger this when isAdult changes specifically, 
+    // but we also need to load initial state.
+    // Let's rely on page reset.
+    setPage(1);
+    setHasMore(true);
+    // We need to fetch page 1 immediately here, or let the page dependency handle it.
+    // If we use page dependency, we need to be careful about the initial render.
+    fetchGifs(1, false);
+  }, [isAdult, fetchGifs]);
+
+  // Handle Scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight;
+      const clientHeight = document.documentElement.clientHeight;
+
+      if (
+        scrollTop + clientHeight >= scrollHeight - 300 &&
+        hasMore &&
+        !loadingRef.current
+      ) {
+        setPage(prev => prev + 1);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [hasMore]);
+
+  // Fetch when page changes (but skip page 1 as it's handled by isAdult/mount effect)
+  // Actually, keeping it simple: manage fetch calls explicitly or use one effect.
+  // Exception: infinite scroll increments page.
+  useEffect(() => {
+    if (page > 1) {
+      fetchGifs(page, true);
+    }
+  }, [page, fetchGifs]);
 
   // Load user preference on mount
   useEffect(() => {
@@ -47,12 +98,13 @@ export default function Home() {
     if (savedPreference === "true") {
       setIsAdult(true);
     }
+    // No explicit fetch here, the isAdult effect handles the first fetch (1, false) 
+    // because setIsAdult triggers it? 
+    // Wait, if savedPreference is true, setIsAdult(true) runs.
+    // If it's false (default), setIsAdult doesn't change.
+    // We need to ensure initial fetch happens.
+    // The isAdult effect runs on mount regardless of change? Yes.
   }, []);
-
-  // Fetch GIFs when isAdult changes (or on mount)
-  useEffect(() => {
-    fetchGifs();
-  }, [fetchGifs]);
 
   const topTags = useMemo(() => {
     const tagCounts = new Map<string, number>();
@@ -90,6 +142,12 @@ export default function Home() {
     return gifs.filter(gif => gif.tags.includes(selectedTag));
   }, [selectedTag, gifs]);
 
+
+  const reload = () => {
+    setPage(1);
+    fetchGifs(1, false);
+  };
+
   return (
     <main className="min-h-screen bg-black relative selection:bg-purple-500/30">
       { /* ... background elements ... */}
@@ -104,7 +162,7 @@ export default function Home() {
       <UploadModal
         isOpen={isUploadOpen}
         onClose={() => setIsUploadOpen(false)}
-        onUploadSuccess={fetchGifs}
+        onUploadSuccess={reload}
       />
 
       <div className="pt-32 pb-12 max-w-7xl mx-auto px-6 relative z-10">
@@ -130,13 +188,17 @@ export default function Home() {
             tags={displayTags}
             selectedTag={selectedTag}
             onSelectTag={handleTagSelect}
+            specialTags={isAdult ? ["+18"] : []}
           />
         </div>
 
-        {loading ? (
-          <div className="text-center py-20 text-gray-500 animate-pulse">Loading Vibes...</div>
-        ) : (
-          <GifGrid gifs={filteredGifs.map(g => ({ ...g, id: g._id }))} />
+        <GifGrid gifs={filteredGifs.map(g => ({ ...g, id: g._id }))} />
+
+        {loading && (
+          <div className="text-center py-12 pb-20 text-gray-500 animate-pulse">Loading more vibes...</div>
+        )}
+        {!hasMore && gifs.length > 0 && (
+          <div className="text-center py-12 text-gray-600 text-sm">No more GIFs to load</div>
         )}
       </div>
     </main>

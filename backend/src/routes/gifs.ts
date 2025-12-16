@@ -7,6 +7,10 @@ const router = express.Router();
 router.get('/', async (req, res) => {
     try {
         const { includeAdult } = req.query;
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 30;
+        const skip = (page - 1) * limit;
+
         let query = {};
 
         // If includeAdult is NOT 'true', only show non-adult content
@@ -14,7 +18,11 @@ router.get('/', async (req, res) => {
             query = { isAdult: { $ne: true } };
         }
 
-        const gifs = await Gif.find(query).sort({ createdAt: -1 });
+        const gifs = await Gif.find(query)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
+
         res.json(gifs);
     } catch (err) {
         res.status(500).json({ message: 'Server Error' });

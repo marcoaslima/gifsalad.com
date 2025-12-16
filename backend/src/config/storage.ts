@@ -48,7 +48,6 @@ export const uploadFile = async (file: Express.Multer.File): Promise<string> => 
         'Content-Type': file.mimetype
     });
 
-    // Return public URL (accessible from browser)
-    const host = process.env.MINIO_PUBLIC_ENDPOINT || 'http://localhost:9000';
-    return `${host}/${bucketName}/${fileName}`;
+    // Return relative path (to be handled by proxy or frontend base URL)
+    return `/${bucketName}/${fileName}`;
 };
